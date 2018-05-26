@@ -1,6 +1,7 @@
 // External Crates
 extern crate walkdir;
 extern crate clap;
+extern crate regex;
 
 //use walkdir::WalkDir;
 
