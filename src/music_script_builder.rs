@@ -41,7 +41,7 @@ pub fn create_or_verify_music_script_file( args: &Arguments, map_name: &str ) ->
     }
     else
     {
-        check_music_script_file( &music_script_path )?;
+        check_music_script_file( args, &music_script_path )?;
         println!("Existing music script file for {} is valid!", map_name);
     }
 
@@ -88,7 +88,7 @@ fn create_music_script_file( args: &Arguments, map_script_path: &PathBuf ) -> Re
 
 use std::io::BufReader;
 
-fn check_music_script_file( music_script_path: &PathBuf ) -> Result<(), Error>
+fn check_music_script_file( args: &Arguments, music_script_path: &PathBuf ) -> Result<(), Error>
 {
     let music_script_file = fs::File::open(music_script_path)?;
     let mut reader = BufReader::new(music_script_file);
@@ -131,7 +131,29 @@ fn check_music_script_file( music_script_path: &PathBuf ) -> Result<(), Error>
                                                         and that there are no nested bracketed sections inside\
                                                         nested bracketed sections."));
     }
-    
+
+    // gesource MUST be installed in one of these two locations due to a sourcemod limitation...
+    // at least it makes things easy.
+    let mut gesource_sound_dir = PathBuf::from("C:\\Program Files (x86)\\Steam\\steamapps\\sourcemods\\gesource\\sound\\");
+
+    if !gesource_sound_dir.is_dir()
+    {
+        gesource_sound_dir = PathBuf::from("C:\\Program Files\\Steam\\steamapps\\sourcemods\\gesource\\sound\\");
+
+        if !gesource_sound_dir.is_dir()
+        {
+            println!("[Warning] Cannot locate GE:S install!  Music paths will not be checked, though file format will be!");
+            return Ok(()); // We've already checked all we can without a GE:S music directory to cross reference our paths with.
+        }
+    }
+
+    let mut local_music_files_dir = args.rootdir.clone();
+    local_music_files_dir.push("sound");
+
+    // Get all possible mp3 files that we can use.
+    let mut mp3_files = get_mp3_files_in_directory( gesource_sound_dir )?;
+    mp3_files.extend( get_mp3_files_in_directory( local_music_files_dir )? );
+
     // If we made it here it means we have a valid file with at least one file entry.  Check those file entries
     // to make sure they're formatted correctly.
 
@@ -140,10 +162,32 @@ fn check_music_script_file( music_script_path: &PathBuf ) -> Result<(), Error>
     for cap in re.captures_iter(&contents)
     {
         // We've already verified we've got a capture, and slot 4 is mandatory for us to have one.
-        let file_path = &cap[4].replace("\"", ""); // Remove possible quotation marks.
-        println!("File = {}", file_path);
+        let fixed_path = cap[4].replace("\"", "").replace("\\", "/"); // Remove possible quotation marks and standardize slashes.
+
+        // Make sure we're an mp3...or are at least claiming to be.
+        if fixed_path.len() > 3 && fixed_path[fixed_path.len()-3..fixed_path.len()].to_lowercase() != "mp3"
+        {
+            let mut error_text = String::new();
+            error_text.push_str("File ");
+            error_text.push_str(&fixed_path);
+            error_text.push_str(" is not an MP3 file!  Please convert it to mp3 format.");
+
+            return Err(Error::new(ErrorKind::InvalidData, error_text ));
+        }
+
+        if !mp3_files.contains(&fixed_path)
+        {
+            let mut error_text = String::new();
+            error_text.push_str("Failed to locate music file: ");
+            error_text.push_str(&fixed_path);
+            error_text.push_str("\nEnsure that the file path is valid and that the file exists.");
+
+            return Err(Error::new(ErrorKind::InvalidData, error_text ));
+        }
     }
 
+    // We made sure the file format is correct and checked all the files for validity!
+    // Our script file is ready for release!
     Ok(())
 }
 
