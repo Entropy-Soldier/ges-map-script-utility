@@ -5,8 +5,9 @@ use argument_handler::Arguments;
 
 use std::path::PathBuf;
 use std::io::{Error, ErrorKind};
+use std::io::BufReader;
 
-use walkdir::WalkDir;
+use shared;
 
 use regex::Regex;
 
@@ -48,12 +49,29 @@ pub fn create_or_verify_music_script_file( args: &Arguments, map_name: &str ) ->
     Ok(())
 }
 
-fn create_music_script_file( args: &Arguments, map_script_path: &PathBuf ) -> Result<(), Error>
+/// Checks every music script in the provided or autodetected GE:S directory.
+pub fn fullcheck_music_script_files( args: &Arguments ) -> Result<(), Error>
+{
+    let mut music_script_dir = args.gesdir.clone();
+    music_script_dir.push("scripts");
+    music_script_dir.push("music");
+
+    if !music_script_dir.is_dir()
+    {
+        return Err(Error::new( ErrorKind::InvalidData, "Music script directory does not exist!  Is this really a valid GE:S install?" ));
+    }
+
+    shared::check_all_files_in_dir_with_func( args, &music_script_dir, "txt", "music scripts", check_music_script_file )?;
+
+    Ok(())
+}
+
+fn create_music_script_file( args: &Arguments, music_script_path: &PathBuf ) -> Result<(), Error>
 {
     let mut music_files_dir = args.rootdir.clone();
     music_files_dir.push("sound");
 
-    let mut music_file_names = get_mp3_files_in_directory( music_files_dir )?;
+    let mut music_file_names = shared::get_files_in_directory( &music_files_dir, "mp3", &[] )?;
 
     // We don't have a sound directory, or it's empty, so let's provide some example music instead!
     if music_file_names.is_empty() 
@@ -79,14 +97,11 @@ fn create_music_script_file( args: &Arguments, map_script_path: &PathBuf ) -> Re
     contents.push_str("}\r\n");
 
     // Make it official and write the final string to the file.
-    let mut music_script_file = fs::File::create(map_script_path)?;
+    let mut music_script_file = fs::File::create(music_script_path)?;
     music_script_file.write_all(contents.as_bytes())?;
 
     Ok(())
 }
-
-
-use std::io::BufReader;
 
 fn check_music_script_file( args: &Arguments, music_script_path: &PathBuf ) -> Result<(), Error>
 {
@@ -109,7 +124,7 @@ fn check_music_script_file( args: &Arguments, music_script_path: &PathBuf ) -> R
     // [^"\{\}] for every character that isn't a control character and
     // [\S&&[^"\{\}]] for every non-whitespace character that isn't a control character.
     let file_re = Regex::new(r#"(?x)^\s*(("music")|(music))\s*
-                        (\{
+                        (\{\s*
                         (
                         (\s*(("file")|(file))\s+(("[^"\{\}]*")|([\S&&[^"\{\}]]+))\s*)
                         |
@@ -119,7 +134,7 @@ fn check_music_script_file( args: &Arguments, music_script_path: &PathBuf ) -> R
                         (\s*(("file")|(file))\s+(("[^"\{\}]*")|([\S&&[^"\{\}]]+))\s*)+
                         \}\s*
                         )
-                        )+
+                        )*
                         \})\s*$"#).unwrap();
     
     if !file_re.is_match(&contents)
@@ -132,37 +147,43 @@ fn check_music_script_file( args: &Arguments, music_script_path: &PathBuf ) -> R
                                                         nested bracketed sections."));
     }
 
-    // gesource MUST be installed in one of these two locations due to a sourcemod limitation...
-    // at least it makes things easy.
-    let mut gesource_sound_dir = PathBuf::from("C:\\Program Files (x86)\\Steam\\steamapps\\sourcemods\\gesource\\sound\\");
+    // Now let's make sure the music paths are valid!  This involves checking the script paths against the GE:S
+    // install and the files in the local directory tree.
 
+    let mut gesource_sound_dir = args.gesdir.clone();
+    gesource_sound_dir.push("sound");
+
+    // Couldn't locate sound directory...which in pretty much all cases means that the gesdir isn't valid either
+    // and it was mentioned in the program arguments checker.  If not, and the user for some reason has a corrupted
+    // GE:S install somehow, the error message still makes a fair bit of sense.
     if !gesource_sound_dir.is_dir()
     {
-        gesource_sound_dir = PathBuf::from("C:\\Program Files\\Steam\\steamapps\\sourcemods\\gesource\\sound\\");
-
-        if !gesource_sound_dir.is_dir()
-        {
-            println!("[Warning] Cannot locate GE:S install!  Music paths will not be checked, though file format will be!");
-            return Ok(()); // We've already checked all we can without a GE:S music directory to cross reference our paths with.
-        }
+        println!("[Warning] Without a valid GE:S directory, music file paths will not be checked, though file format will be!");
+        return Ok(()); // We've already checked all we can without a GE:S music directory to cross reference our paths with.
     }
 
     let mut local_music_files_dir = args.rootdir.clone();
     local_music_files_dir.push("sound");
 
     // Get all possible mp3 files that we can use.
-    let mut mp3_files = get_mp3_files_in_directory( gesource_sound_dir )?;
-    mp3_files.extend( get_mp3_files_in_directory( local_music_files_dir )? );
+    let mut mp3_files = shared::get_files_in_directory( &gesource_sound_dir, "mp3", &[] )?;
+
+    // Don't try to collect local sound files if we don't have a sound directory...which is very
+    // possible if the map uses entirely default music.
+    if local_music_files_dir.is_dir() && local_music_files_dir != gesource_sound_dir
+    {
+        mp3_files.extend( shared::get_files_in_directory( &local_music_files_dir, "mp3", &[] )? );
+    }
 
     // If we made it here it means we have a valid file with at least one file entry.  Check those file entries
-    // to make sure they're formatted correctly.
+    // to make sure they're formatted correctly and point to a valid music file.
 
     let re = Regex::new(r#"\s*(("file")|(file))\s+(("[^"\{\}]*")|([\S&&[^"\{\}]]+))\s*"#).unwrap();
 
     for cap in re.captures_iter(&contents)
     {
         // We've already verified we've got a capture, and slot 4 is mandatory for us to have one.
-        let fixed_path = cap[4].replace("\"", "").replace("\\", "/"); // Remove possible quotation marks and standardize slashes.
+        let fixed_path = cap[4].replace("\"", "").replace("\\", "/").to_lowercase(); // Remove possible quotation marks and standardize slashes.
 
         // Make sure we're an mp3...or are at least claiming to be.
         if fixed_path.len() > 3 && fixed_path[fixed_path.len()-3..fixed_path.len()].to_lowercase() != "mp3"
@@ -175,79 +196,20 @@ fn check_music_script_file( args: &Arguments, music_script_path: &PathBuf ) -> R
             return Err(Error::new(ErrorKind::InvalidData, error_text ));
         }
 
+        // Check to see if our MP3 file is one of the files we've detected in the relevant directories.
+        // if not, our script is pointing to an invalid file and isn't ready for release!
         if !mp3_files.contains(&fixed_path)
         {
             let mut error_text = String::new();
-            error_text.push_str("Failed to locate music file: ");
+            error_text.push_str("Failed to locate music file ");
             error_text.push_str(&fixed_path);
-            error_text.push_str("\nEnsure that the file path is valid and that the file exists.");
+            error_text.push_str(" in either the GE:S or local directory tree\nEnsure that the file path is valid and that the file exists.");
 
             return Err(Error::new(ErrorKind::InvalidData, error_text ));
         }
     }
 
     // We made sure the file format is correct and checked all the files for validity!
-    // Our script file is ready for release!
+    // Our music script file is ready for release!
     Ok(())
-}
-
-fn get_mp3_files_in_directory( music_files_dir: PathBuf ) -> Result<Vec<String>, Error>
-{
-    let mut music_file_names: Vec<String> = Vec::new(); 
-
-    // Grab the sound directory here for later.
-    let music_dir_path = music_files_dir.to_str();
-
-    if music_dir_path == None 
-    {  
-        return Err(Error::new( ErrorKind::InvalidInput, "Could not construct sound directory path string!"));
-    }
-
-    // We just made sure it's not None so we can unwrap it.
-    let music_dir_path = music_dir_path.unwrap();
-
-    // Make sure our sound directory exists and if so scan it for files.
-    if music_files_dir.is_dir()
-    {
-        for entry in WalkDir::new( &music_files_dir ) 
-        {
-            let entry = entry?;
-            let entrypath = entry.path();
-            // We only want to include MP3 files in our music file listing, and only the
-            // part of the path following our root path.
-
-            // Not a file we have access to, don't worry about it.
-            if !entrypath.is_file() { continue; }
-
-            // We don't have an extension so we can't be an MP3 file!
-            if entrypath.extension() == None { continue; }
-
-            // Can unwrap to check since we already know Nonetypes have been skipped over.
-            let file_extension = entrypath.extension().unwrap().to_str();
-
-            // Make sure we can actually convert this to a normal string.
-            if file_extension == None { continue }
-
-            // We only want MP3s.
-            if file_extension.unwrap().to_lowercase() != "mp3" { continue; }
-
-            // Grab the full file path as a string so we can turn it into a relative path.
-            let path_string = entrypath.to_str();
-            if path_string == None { continue; }
-
-            let path_string = path_string.unwrap();
-
-            // The path string is a child of the sound_dir_path string, so it will always be longer.
-            // With this info we cut out the parent path + the final slash to get our music script path.
-            let path_string = &path_string[music_dir_path.len() + 1..];
-
-            // The traditional standard for music scripts use forward slashes in the paths for some reason.
-            // this also gives us our final String object to push into the array.
-            let final_path_string = path_string.replace("\\", "/");
-
-            music_file_names.push( final_path_string );
-        }
-    }
-
-    Ok(music_file_names)
 }

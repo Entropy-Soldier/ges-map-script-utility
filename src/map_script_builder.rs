@@ -5,6 +5,9 @@ use argument_handler::Arguments;
 
 use std::path::PathBuf;
 use std::io::{Error, ErrorKind};
+use std::io::BufReader;
+
+use shared;
 
 /// Generates the map script file used for random selection behavior.  
 /// Returns Ok() if successful and an error if not.
@@ -32,9 +35,26 @@ pub fn create_or_verify_map_script_file( args: &Arguments, map_name: &str ) -> R
     }
     else
     {
-        check_map_script_file( &map_script_path )?;
+        check_map_script_file( args, &map_script_path )?;
         println!("Existing map script file for {} is valid!", map_name);
     }
+
+    Ok(())
+}
+
+/// Checks every map script in the provided or autodetected GE:S directory.
+pub fn fullcheck_map_script_files( args: &Arguments ) -> Result<(), Error>
+{
+    let mut map_script_dir = args.gesdir.clone();
+    map_script_dir.push("scripts");
+    map_script_dir.push("maps");
+
+    if !map_script_dir.is_dir()
+    {
+        return Err(Error::new( ErrorKind::InvalidData, "Map script directory does not exist!  Is this really a valid GE:S install?" ));
+    }
+
+    shared::check_all_files_in_dir_with_func( args, &map_script_dir, "txt", "map scripts", check_map_script_file )?;
 
     Ok(())
 }
@@ -91,10 +111,8 @@ fn create_map_script_file( args: &Arguments, map_script_path: &PathBuf ) -> Resu
     Ok(())
 }
 
-
-use std::io::BufReader;
-
-fn check_map_script_file( map_script_path: &PathBuf ) -> Result<(), Error>
+/// Take arguments here even though we don't use them so our function signature matches the other check functions.
+fn check_map_script_file( _args: &Arguments, map_script_path: &PathBuf ) -> Result<(), Error>
 {
     let map_script_file = fs::File::open(map_script_path)?;
     let reader = BufReader::new(map_script_file);
