@@ -34,6 +34,8 @@ fn main()
     }
 }
 
+/// Runs on the provided rootdir, checking to make sure that every script file exists and is valid.
+/// If a script file does not exist, it will be created.
 fn create_or_verify_map_script_files( args: argument_handler::Arguments, map_name: String )
 {
     // If we made it here, we can assume we can read our target directory and the required files
@@ -46,8 +48,6 @@ fn create_or_verify_map_script_files( args: argument_handler::Arguments, map_nam
     // Clone the program input so rust will be happy.
     let args_maps = args.clone();
     let map_name_maps = map_name.clone();
-    let args_music = args.clone();
-    let map_name_music = map_name.clone();
 
     if args.verbose
     {
@@ -63,26 +63,28 @@ fn create_or_verify_map_script_files( args: argument_handler::Arguments, map_nam
         Err(e) => { println!("[Error] Failed map script section with error:\n{}\n", e); 0x0002 },
     }});
 
-    let music_script_handle = thread::spawn( move || {
-    match music_script_builder::create_or_verify_music_script_file( &args_music, &map_name_music )
-    {
-        Ok(_) => 0x0000,
-        Err(e) => { println!("[Error] Failed music script section with error:\n{}\n", e); 0x0004 },
-    }});
-
-    let mut error_code = match reslist_builder::create_or_verify_reslist( &args, &map_name )
+    let mut error_code = match music_script_builder::create_or_verify_music_script_file( &args, &map_name )
     {
         Ok(_) => 0x0000,
         Err(e) => { println!("[Error] Failed reslist section with error:\n{}\n", e); 0x0008 },
     };
-    
-    error_code += music_script_handle.join().unwrap_or(0x0004);
+
+    // We need to join here on the chance we're creating a reslist.
+    // If we start making our reslist before the other files have a chance to be made, 
+    // we could fail to include them in it!
     error_code += map_script_handle.join().unwrap_or(0x0002);
+
+    error_code += match reslist_builder::create_or_verify_reslist( &args, &map_name )
+    {
+        Ok(_) => 0x0000,
+        Err(e) => { println!("[Error] Failed reslist section with error:\n{}\n", e); 0x0008 },
+    };
 
     // We made it to the end!  Return our error code, which is the combined result of each module that may have failed.
     pause_then_exit( !args.noexitprompt, error_code );
 }
 
+/// Runs fullcheck mode on the GE:S directory, checking every single script file for validity.
 fn fullcheck_ges_directory( args: argument_handler::Arguments )
 {
     let args_maps = args.clone();
@@ -122,6 +124,7 @@ fn fullcheck_ges_directory( args: argument_handler::Arguments )
     pause_then_exit( !args.noexitprompt, error_code );
 }
 
+/// If enabled, provides a prompt to the user and then exits the program with the provided error code.
 fn pause_then_exit( show_exit_prompt: bool, exit_code: i32 )
 {
     // Prompt the user for input then proceed once that input has been given.

@@ -21,6 +21,8 @@ pub struct Arguments
     pub noexitprompt: bool,
 }
 
+/// Takes the program arguments input by the user, validates them, and returns them as an Arguments object.
+/// Also infers the map name.
 pub fn parse_and_validate_arguments() -> Result<( Arguments, String ), Error>
 {
     let program_arguments = parse_arguments();
@@ -58,7 +60,7 @@ pub fn parse_and_validate_arguments() -> Result<( Arguments, String ), Error>
 fn parse_arguments() -> Arguments
 {
     let matches = App::new("GE:S Map Release Assistant for 5.0")
-        .version("1.0")
+        .version("0.9")
         .author("Entropy-Soldier <entropysoldierprojects@gmail.com>")
         .about("Assists with the release of GoldenEye: Source 5.0 maps by automatically creating several key files.")
         .arg(Arg::with_name("rootdir")
@@ -233,7 +235,7 @@ fn get_map_name( args: &Arguments ) -> String
                     {
                         match path.file_stem()
                         {
-                            Some(x) => return String::from( x.to_str().unwrap() ),
+                            Some(x) => return String::from( x.to_str().expect("Encountered invalid BSP name when reading maps directory.") ),
                             None => {},
                         }
                     }

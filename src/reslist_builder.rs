@@ -11,7 +11,7 @@ use shared;
 
 use regex::Regex;
 
-/// Generates the reslist used for map asset downloads
+/// Generates or checks the reslist used for map asset downloads
 /// Returns Ok() if successful and an error if not.
 pub fn create_or_verify_reslist( args: &Arguments, map_name: &str ) -> Result<(), Error>
 {
@@ -51,6 +51,7 @@ pub fn fullcheck_reslist_files( args: &Arguments ) -> Result<(), Error>
     Ok(())
 }
 
+/// Creates a reslist that includes every file in the local directory.
 fn create_reslist( args: &Arguments, reslist_path: &PathBuf ) -> Result<(), Error>
 {
     // Grab every file in the directory so we can make sure the server will download
@@ -90,6 +91,8 @@ fn create_reslist( args: &Arguments, reslist_path: &PathBuf ) -> Result<(), Erro
     Ok(())
 }
 
+/// Makes sure every file in the local directory tree is included in the provided reslist, that the reslist is
+/// formatted correctly, and that every file in the reslist exists in the local directory path.
 fn check_reslist( args: &Arguments, reslist_path: &PathBuf ) -> Result<(), Error>
 {
     let reslist_file = fs::File::open(reslist_path)?;
@@ -238,6 +241,8 @@ fn check_reslist( args: &Arguments, reslist_path: &PathBuf ) -> Result<(), Error
 
 use std::sync::Mutex;
 
+/// Provides a reference to a vector storing strings that correspond to the relative paths of every file in
+/// the provided directory.  Subsequent calls return the cached value of the first call.
 pub fn generate_directory_tree( args: &Arguments, disallowed_filetypes: &[&str] ) -> Result<&'static Vec<String>, Error>
 {
     lazy_static!

@@ -59,6 +59,7 @@ pub fn fullcheck_map_script_files( args: &Arguments ) -> Result<(), Error>
     Ok(())
 }
 
+/// Creates a map script file with the given path and arguments in the standard GE:S map script format.
 fn create_map_script_file( args: &Arguments, map_script_path: &PathBuf ) -> Result<(), Error>
 {
     let mut map_script_file = fs::File::create(map_script_path)?;
@@ -111,6 +112,7 @@ fn create_map_script_file( args: &Arguments, map_script_path: &PathBuf ) -> Resu
     Ok(())
 }
 
+/// Checks the map script file for format and parameter validity.
 /// Take arguments here even though we don't use them so our function signature matches the other check functions.
 fn check_map_script_file( _args: &Arguments, map_script_path: &PathBuf ) -> Result<(), Error>
 {
@@ -247,6 +249,7 @@ fn check_map_script_file( _args: &Arguments, map_script_path: &PathBuf ) -> Resu
     Ok(())
 }
 
+// Makes sure the given line value for the provided line identifier exists and is valid.
 fn check_line_value_validity( line_identifier: &str, line_value: Option<&str> ) -> Result<(), Error>
 {
     if line_value == None

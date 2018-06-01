@@ -155,6 +155,12 @@ pub fn check_all_files_in_dir_with_func( args: &Arguments, dir: &PathBuf, extens
 use std::sync::Mutex;
 use std::ops::DerefMut;
 
+/// Walks each directory in cache_dirs and runs get_files_in_directory on them with the target_filetype and disallowed_filetype
+/// parameters.  After completion, the results will be stored in the contents of directory_cache and mutex will be set to true and
+/// a reference to the contents of directory_cache will be returned.
+/// On subsequent calls with references to the same two variables, the computation is skipped and the contents of
+/// directory cache are returned directly.  This saves us from having to walk a directory set multiple times when
+/// the contents will not change between invocations.
 pub fn compute_or_get_safe_reference_to_directory_cache( cache_dirs: Vec<&PathBuf>, target_filetype: &str, disallowed_filetypes: &[&str], mutex: &'static Mutex<bool>, directory_cache: &'static mut Option<Vec<String>> ) -> Result<&'static Vec<String>, Error>
 {
     // First grab the mutex guard for the init variable.  If we're uninitalized, then we'll grab this and

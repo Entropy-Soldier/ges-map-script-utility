@@ -66,6 +66,8 @@ pub fn fullcheck_music_script_files( args: &Arguments ) -> Result<(), Error>
     Ok(())
 }
 
+/// Creates a music script file at the given path using the files provided in the sound directory.
+/// If none are provided, it will create a default script instead.
 fn create_music_script_file( args: &Arguments, music_script_path: &PathBuf ) -> Result<(), Error>
 {
     let mut music_files_dir = args.rootdir.clone();
@@ -103,6 +105,7 @@ fn create_music_script_file( args: &Arguments, music_script_path: &PathBuf ) -> 
     Ok(())
 }
 
+/// Ensures that the music script file follows the correct format and that every file reference is valid.
 fn check_music_script_file( args: &Arguments, music_script_path: &PathBuf ) -> Result<(), Error>
 {
     let music_script_file = fs::File::open(music_script_path)?;
@@ -222,6 +225,8 @@ fn check_music_script_file( args: &Arguments, music_script_path: &PathBuf ) -> R
 
 use std::sync::Mutex;
 
+/// Provides a reference to a vector storing strings that correspond to the relative paths of every file in
+/// the provided directory.  Subsequent calls return the cached value of the first call.
 pub fn generate_mp3_directory_tree( gesource_sound_dir: &PathBuf, local_sound_dir: &PathBuf, target_type: &str ) -> Result<&'static Vec<String>, Error>
 {
     lazy_static!
