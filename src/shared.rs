@@ -10,6 +10,11 @@ use argument_handler::Arguments;
 pub fn get_files_in_directory( files_dir: &PathBuf, target_extension: &str, excluded_extensions: &[&str] ) -> Result<Vec<String>, Error>
 {
     // This is where the relative paths of our desired files will go.
+    // For larger sets a hashmap would be better for the constant lookup time, but the linear lookup time
+    // in Vec is actually quite fast and most map release directory structures have less than 100 entries.
+    // With smaller data sets, vec is usually going to be much faster, and no arbitrary insertion is ever needed.
+    // Fullcheck mode will involve an upwards of 20,000 files, but this is a more esoteric use of the program
+    // and even then the search time on the vectors is nearly imperceptable when scanning through ~50 music scripts.
     let mut file_names: Vec<String> = Vec::new(); 
 
     // Grab the directory path here for later.
@@ -145,4 +150,40 @@ pub fn check_all_files_in_dir_with_func( args: &Arguments, dir: &PathBuf, extens
     println!("\nAll {} {} in {} are formatted correctly!", scanned_file_count, print_type, dir.display());
 
     Ok(())
+}
+
+use std::sync::Mutex;
+use std::ops::DerefMut;
+
+pub fn compute_or_get_safe_reference_to_directory_cache( cache_dirs: Vec<&PathBuf>, target_filetype: &str, disallowed_filetypes: &[&str], mutex: &'static Mutex<bool>, directory_cache: &'static mut Option<Vec<String>> ) -> Result<&'static Vec<String>, Error>
+{
+    // First grab the mutex guard for the init variable.  If we're uninitalized, then we'll grab this and
+    // do the computations, and set the value to true.  If we're in the proccess of initalizing, we'll wait
+    // for the lock and after we aquire it we'll be initalized.  If we're initalized, we'll get the lock to
+    // confirm that and then just return a reference to dirlist.  Once we hit the end of the unsafe block we
+    // will drop the lock and let the next iteration take over.
+    let mut init_guard = mutex.lock().unwrap();
+    let has_init = init_guard.deref_mut();
+
+    if !*has_init
+    {
+        *directory_cache = Some(Vec::new());
+    }
+
+    let dirlist_ref = match *directory_cache
+    {
+            Some(ref mut x) => &mut *x,
+            None => return Err(Error::new(ErrorKind::Other, "Failed to create directory cache!")),
+    };
+
+    if !*has_init
+    {
+        for dir in cache_dirs
+        {
+            dirlist_ref.append(&mut get_files_in_directory( &dir, target_filetype, disallowed_filetypes )?);
+        }
+        *has_init = true;
+    }
+
+    return Ok(dirlist_ref);
 }

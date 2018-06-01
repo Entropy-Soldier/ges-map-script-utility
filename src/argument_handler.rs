@@ -6,6 +6,7 @@ use std::fs;
 use std::io::{Error, ErrorKind};
 
 /// Struct that holds the core arguments of the program.
+#[derive(Clone)]
 pub struct Arguments
 {
     pub rootdir: PathBuf,

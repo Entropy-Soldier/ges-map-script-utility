@@ -104,12 +104,15 @@ fn check_reslist( args: &Arguments, reslist_path: &PathBuf ) -> Result<(), Error
     // No other complications or fancy setup to look for.
     // Using [Rr] instead of the (?i) flag since the (?i) flag seems to increase runtimes significantly,
     // and people probably don't need to call it "ReSoUrCeS" or something like that.
-    let file_re = Regex::new(r#"(?x)^\s*(("[Rr]esources")|([Rr]esources))\s*
-                    (\{
-                    (\s*(("[^"\{\}]*")|([\S&&[^"\{\}]]+))\s+(("file")|(file))\s*)+
-                    \})\s*$"#).unwrap();
-
-    if !file_re.is_match(&contents)
+    lazy_static! // Using lazy static as reccomended by the Rust documentation for optimization purposes.
+    {
+        static ref FILE_RE: Regex = Regex::new(r#"(?x)^\s*(("[Rr]esources")|([Rr]esources))\s*
+                                (\{
+                                (\s*(("[^"\{\}]*")|([\S&&[^"\{\}]]+))\s+(("file")|(file))\s*)+
+                                \})\s*$"#).unwrap();
+    }
+    
+    if !FILE_RE.is_match(&contents)
     {
         return Err(Error::new( ErrorKind::InvalidData, "Script contains core format mistake!\n  Make sure every \
                                                         bracket and quotation mark has a partner, the main section \
@@ -128,18 +131,21 @@ fn check_reslist( args: &Arguments, reslist_path: &PathBuf ) -> Result<(), Error
     // Exe files are not allowed as executable files are useless for a map's purposes and most likely this category would just be
     // including the ges_mapreleaser.exe file if it was used with no parameters and placed in the root directory.
     let disallowed_filetypes = ["bsp", "res", "exe"];
-    let file_list = generate_directory_tree( args, &disallowed_filetypes )?;
 
-    if args.verbose
-    {
-        println!("Created file reference list with {} entries!", file_list.len());
-    }
+    // We need to have all the files in the directory to make sure that they're being included in our script.
+    // Otherwise the mapper could be sending out a file they don't need to, or forgot to put in the reslist.
+    // Incurs a sizable performance hit on fullcheck mode, but with caching and a large number of reslists to
+    // scan through it performs alright.
+    let file_list = generate_directory_tree( args, &disallowed_filetypes )?;
 
     let mut checked_file_list: Vec<String> = Vec::new(); 
 
-    let re = Regex::new(r#"\s*(("[^"\{\}]*")|([\S&&[^"\{\}]]+))\s+(("file")|(file))\s*"#).unwrap();
+    lazy_static!
+    {
+        static ref RE: Regex = Regex::new(r#"\s*(("[^"\{\}]*")|([\S&&[^"\{\}]]+))\s+(("file")|(file))\s*"#).unwrap();
+    }
 
-    for cap in re.captures_iter(&contents)
+    for cap in RE.captures_iter(&contents)
     {
         // We've already verified we've got a capture, and slot 1 is mandatory for us to have one.
         let fixed_path = cap[1].replace("\"", "").replace("\\", "/").to_lowercase(); // Remove possible quotation marks and standardize slashes.
@@ -230,33 +236,21 @@ fn check_reslist( args: &Arguments, reslist_path: &PathBuf ) -> Result<(), Error
 }
 
 
-use std::sync::{Mutex, MutexGuard};
-use std::ops::DerefMut;
-use std::ops::Deref;
+use std::sync::Mutex;
 
-pub fn generate_directory_tree( args: &Arguments, disallowed_filetypes: &[&str] ) -> Result<MutexGuard<Vec<String>>, Error>
+pub fn generate_directory_tree( args: &Arguments, disallowed_filetypes: &[&str] ) -> Result<&'static Vec<String>, Error>
 {
     lazy_static!
     {
-        static ref DIRLIST: Mutex<Vec<String>> = Mutex::new(Vec::new());
-        static ref DIRLIST_INIT: Mutex<bool> = Mutex::new(false);
+        static ref DIRLIST_INIT_STATE: Mutex<bool> = Mutex::new(false);
     }
 
+    static mut DIRLIST: Option<Vec<String>> = None;
+
+    // Unsafe because the alternative is more convoluted to use, the possibility of a data race is almost 0,
+    // and the negative outcome of one would be a performance penalty and nothing else.
+    unsafe
     {
-        let mut dirlist_init_mutex = DIRLIST_INIT.lock().unwrap();
-        let dirlist_init_ref = dirlist_init_mutex.deref_mut();
-
-        if !*dirlist_init_ref
-        {
-            let mut dirlist_mutex = DIRLIST.lock().unwrap();
-            let mut dirlist_ref = dirlist_mutex.deref_mut();
-
-            *dirlist_init_ref = true;
-            dirlist_ref.append(&mut shared::get_files_in_directory( &args.rootdir, "", &disallowed_filetypes )?);
-        }
+        return shared::compute_or_get_safe_reference_to_directory_cache( vec![&args.rootdir], "", disallowed_filetypes, &DIRLIST_INIT_STATE, &mut DIRLIST );
     }
-
-    let dirlist_ref = DIRLIST.lock().unwrap();
-    
-    return Ok(&dirlist_ref);
 }

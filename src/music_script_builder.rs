@@ -123,21 +123,26 @@ fn check_music_script_file( args: &Arguments, music_script_path: &PathBuf ) -> R
     // scan the individual entries to make sure the tracks are entered correctly.
     // [^"\{\}] for every character that isn't a control character and
     // [\S&&[^"\{\}]] for every non-whitespace character that isn't a control character.
-    let file_re = Regex::new(r#"(?x)^\s*(("music")|(music))\s*
-                        (\{\s*
-                        (
-                        (\s*(("file")|(file))\s+(("[^"\{\}]*")|([\S&&[^"\{\}]]+))\s*)
-                        |
-                        (
-                        (("[^"\{\}]*")|([\S&&[^"\{\}]]+))\s*
-                        \{\s*
-                        (\s*(("file")|(file))\s+(("[^"\{\}]*")|([\S&&[^"\{\}]]+))\s*)+
-                        \}\s*
-                        )
-                        )*
-                        \})\s*$"#).unwrap();
-    
-    if !file_re.is_match(&contents)
+    // Lazy static is used to allow for compiler optimizations and to ensure costly regexs aren't compiled
+    // multiple times.
+    lazy_static!
+    {
+        static ref FILE_RE: Regex = Regex::new(r#"(?x)^\s*(("music")|(music))\s*
+                                        (\{\s*
+                                        (
+                                        (\s*(("file")|(file))\s+(("[^"\{\}]*")|([\S&&[^"\{\}]]+))\s*)
+                                        |
+                                        (
+                                        (("[^"\{\}]*")|([\S&&[^"\{\}]]+))\s*
+                                        \{\s*
+                                        (\s*(("file")|(file))\s+(("[^"\{\}]*")|([\S&&[^"\{\}]]+))\s*)+
+                                        \}\s*
+                                        )
+                                        )*
+                                        \})\s*$"#).unwrap();
+    }
+
+    if !FILE_RE.is_match(&contents)
     {
         return Err(Error::new( ErrorKind::InvalidData, "Script contains core format mistake!\n  Make sure every \
                                                         bracket and quotation mark has a partner, the main section \
@@ -166,21 +171,22 @@ fn check_music_script_file( args: &Arguments, music_script_path: &PathBuf ) -> R
     local_music_files_dir.push("sound");
 
     // Get all possible mp3 files that we can use.
-    let mut mp3_files = shared::get_files_in_directory( &gesource_sound_dir, "mp3", &[] )?;
-
-    // Don't try to collect local sound files if we don't have a sound directory...which is very
-    // possible if the map uses entirely default music.
-    if local_music_files_dir.is_dir() && local_music_files_dir != gesource_sound_dir
-    {
-        mp3_files.extend( shared::get_files_in_directory( &local_music_files_dir, "mp3", &[] )? );
-    }
+    // You might wonder why this is preferable to just checking if the MP3 files in the script are valid files
+    // on an as-needed basis.  Well, this would normally be ideal, but the assumption is that if a file is in
+    // the sound directory it will probably be used, so we might as well scan them all at once.  This breaks down
+    // a bit with the inclusion of scanning the local GE:S sound directory as well, but it does shave off a large
+    // amount of syscalls on fullcheck mode and lets us share a lot of code between us and the reslist checker.
+    let mp3_files = generate_mp3_directory_tree( &gesource_sound_dir, &local_music_files_dir, "mp3" )?;
 
     // If we made it here it means we have a valid file with at least one file entry.  Check those file entries
     // to make sure they're formatted correctly and point to a valid music file.
 
-    let re = Regex::new(r#"\s*(("file")|(file))\s+(("[^"\{\}]*")|([\S&&[^"\{\}]]+))\s*"#).unwrap();
+    lazy_static!
+    {
+        static ref RE: Regex = Regex::new(r#"\s*(("file")|(file))\s+(("[^"\{\}]*")|([\S&&[^"\{\}]]+))\s*"#).unwrap();
+    }
 
-    for cap in re.captures_iter(&contents)
+    for cap in RE.captures_iter(&contents)
     {
         // We've already verified we've got a capture, and slot 4 is mandatory for us to have one.
         let fixed_path = cap[4].replace("\"", "").replace("\\", "/").to_lowercase(); // Remove possible quotation marks and standardize slashes.
@@ -212,4 +218,32 @@ fn check_music_script_file( args: &Arguments, music_script_path: &PathBuf ) -> R
     // We made sure the file format is correct and checked all the files for validity!
     // Our music script file is ready for release!
     Ok(())
+}
+
+use std::sync::Mutex;
+
+pub fn generate_mp3_directory_tree( gesource_sound_dir: &PathBuf, local_sound_dir: &PathBuf, target_type: &str ) -> Result<&'static Vec<String>, Error>
+{
+    lazy_static!
+    {
+        static ref DIRLIST_INIT_STATE: Mutex<bool> = Mutex::new(false);
+    }
+
+    static mut DIRLIST: Option<Vec<String>> = None;
+
+    // Unsafe because the alternative is more convoluted to use, the possibility of a data race is almost 0,
+    // and the negative outcome of one would be a performance penalty and nothing else.
+    unsafe
+    {
+        let mut dirs_to_scan = vec![gesource_sound_dir];
+
+        // Don't try to collect local sound files if we don't have a sound directory...which is very
+        // possible if the map uses entirely default music.
+        if local_sound_dir.is_dir() && local_sound_dir != gesource_sound_dir
+        {
+            dirs_to_scan.push(local_sound_dir);
+        }
+
+        return shared::compute_or_get_safe_reference_to_directory_cache( dirs_to_scan, target_type, &[], &DIRLIST_INIT_STATE, &mut DIRLIST );
+    }
 }
