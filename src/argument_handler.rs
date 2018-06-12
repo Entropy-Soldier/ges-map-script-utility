@@ -16,6 +16,8 @@ pub struct Arguments
     pub maxplayers: i32,
     pub resintensity: i32,
     pub teamthresh: i32,
+    pub compress: bool,
+    pub recompress: bool,
     pub verbose: bool,
     pub fullcheck: bool,
     pub noexitprompt: bool,
@@ -110,6 +112,16 @@ fn parse_arguments() -> Arguments
             .long("fullcheck")
             .help( "With this flag set, the program will instead not do map release checks but instead check all script files in the supplied or detected GE:S directory.  Good for server owners who want to check all of their script files at once." )
             .takes_value(false))
+        .arg(Arg::with_name("compress")
+            .short("c")
+            .long("compress")
+            .help( "Generate bzipped version of all relevant files for server upload." )
+            .takes_value(false))
+        .arg(Arg::with_name("recompress")
+            .short("z")
+            .long("recompress")
+            .help( "Same as compressed, but will delete all existing compressed files before starting.  Its usage implies the compressed flag." )
+            .takes_value(false))
         .arg(Arg::with_name("verbose")
             .short("v")
             .long("verbose")
@@ -199,6 +211,11 @@ fn parse_arguments() -> Arguments
 
     let noexitprompt_arg = matches.is_present("noexitprompt");
 
+    let recompress_arg = matches.is_present("recompress");
+
+    // recompress implies compress
+    let compress_arg = matches.is_present("compress") || recompress_arg;
+
     Arguments
     {
         rootdir: rootdir_arg,
@@ -208,6 +225,8 @@ fn parse_arguments() -> Arguments
         maxplayers: maxplayers_arg,
         resintensity: resintensity_arg,
         teamthresh: teamthresh_arg,
+        compress: compress_arg,
+        recompress: recompress_arg,
         verbose: verbose_arg,
         fullcheck: fullcheck_arg,
         noexitprompt: noexitprompt_arg,
@@ -311,6 +330,13 @@ fn check_arguments( args: &Arguments, map_name: &str ) -> Result<(), Error>
         if !musicdir.is_dir()
         {
             println!( "[Warning] Root directory {} has no music directory!  A default music file will be provided.", args.rootdir.display() );
+        }
+    }
+    else // Is fullcheck mode.
+    {
+        if args.compress
+        {
+            println!( "[Warning] Cannot compress directory in fullcheck mode but compress flag is set!\nThe compression flag will be ignored." );
         }
     }
 

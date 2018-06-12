@@ -252,3 +252,36 @@ pub fn generate_mp3_directory_tree( gesource_sound_dir: &PathBuf, local_sound_di
         return shared::compute_or_get_safe_reference_to_directory_cache( dirs_to_scan, target_type, &[], &DIRLIST_INIT_STATE, &mut DIRLIST );
     }
 }
+
+#[cfg(test)]
+mod tests 
+{
+    use shared::get_barebones_args;
+    use shared::get_root_test_directory;
+    use shared::do_validity_test;
+    use super::*;
+
+    #[test]
+    fn test_valid_music_scripts() 
+    {
+        let mut valid_music_script_dir = get_root_test_directory();
+        valid_music_script_dir.push("music_script_tests");
+        valid_music_script_dir.push("valid");
+
+        let args = get_barebones_args();
+
+        do_validity_test(&args, &valid_music_script_dir, "Music Script", check_music_script_file, true);
+    }
+
+    #[test]
+    fn test_invalid_music_scripts() 
+    {
+        let mut invalid_music_script_dir = get_root_test_directory();
+        invalid_music_script_dir.push("music_script_tests");
+        invalid_music_script_dir.push("invalid");
+
+        let args = get_barebones_args();
+
+        do_validity_test(&args, &invalid_music_script_dir, "Music Script", check_music_script_file, false);
+    }
+}

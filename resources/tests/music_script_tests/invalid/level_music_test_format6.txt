@@ -1,0 +1,7 @@
+"music"
+{
+	"file"	"music/base_song1.mp3
+	file"	music/base_song2.mp3"
+	"file"	"music/base_song3.mp3"
+	"file	"music/base_song4.mp3
+}

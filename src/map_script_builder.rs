@@ -280,3 +280,36 @@ fn check_line_value_validity( line_identifier: &str, line_value: Option<&str> ) 
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests 
+{
+    use shared::get_barebones_args;
+    use shared::get_root_test_directory;
+    use shared::do_validity_test;
+    use super::*;
+
+    #[test]
+    fn test_valid_map_scripts() 
+    {
+        let mut valid_map_script_dir = get_root_test_directory();
+        valid_map_script_dir.push("map_script_tests");
+        valid_map_script_dir.push("valid");
+
+        let args = get_barebones_args();
+
+        do_validity_test(&args, &valid_map_script_dir, "Map Script", check_map_script_file, true);
+    }
+
+    #[test]
+    fn test_invalid_map_scripts() 
+    {
+        let mut invalid_map_script_dir = get_root_test_directory();
+        invalid_map_script_dir.push("map_script_tests");
+        invalid_map_script_dir.push("invalid");
+
+        let args = get_barebones_args();
+
+        do_validity_test(&args, &invalid_map_script_dir, "Map Script", check_map_script_file, false);
+    }
+}

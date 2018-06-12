@@ -11,6 +11,15 @@ use shared;
 
 use regex::Regex;
 
+
+// Grab all files in our installation except for the disallowed file types, to make sure everything is included.
+// BSP files are not allowed as it wouldn't make sense to include the map itself in the reslist or any other maps with it.
+// Res files are not allowed as the reslist itself doesn't need to be included for clients to download.
+// Exe files are not allowed as executable files are useless for a map's purposes and most likely this category would just be
+// including the ges_mapreleaser.exe file if it was used with no parameters and placed in the root directory.
+static DISALLOWED_FILETYPES: &[&'static str] = &["bsp", "res", "exe"];
+
+
 /// Generates or checks the reslist used for map asset downloads
 /// Returns Ok() if successful and an error if not.
 pub fn create_or_verify_reslist( args: &Arguments, map_name: &str ) -> Result<(), Error>
@@ -128,18 +137,11 @@ fn check_reslist( args: &Arguments, reslist_path: &PathBuf ) -> Result<(), Error
     // If we made it here it means we have a valid file with at least one file entry.  Check those file entries
     // to make sure they're formatted correctly and point to a valid file that we're including with the map.
 
-    // Grab all files in our installation except for the disallowed file types, to make sure everything is included.
-    // BSP files are not allowed as it wouldn't make sense to include the map itself in the reslist or any other maps with it.
-    // Res files are not allowed as the reslist itself doesn't need to be included for clients to download.
-    // Exe files are not allowed as executable files are useless for a map's purposes and most likely this category would just be
-    // including the ges_mapreleaser.exe file if it was used with no parameters and placed in the root directory.
-    let disallowed_filetypes = ["bsp", "res", "exe"];
-
     // We need to have all the files in the directory to make sure that they're being included in our script.
     // Otherwise the mapper could be sending out a file they don't need to, or forgot to put in the reslist.
     // Incurs a sizable performance hit on fullcheck mode, but with caching and a large number of reslists to
     // scan through it performs alright.
-    let file_list = generate_directory_tree( args, &disallowed_filetypes )?;
+    let file_list = generate_directory_tree( args )?;
 
     let mut checked_file_list: Vec<String> = Vec::new(); 
 
@@ -154,7 +156,7 @@ fn check_reslist( args: &Arguments, reslist_path: &PathBuf ) -> Result<(), Error
         let fixed_path = cap[1].replace("\"", "").replace("\\", "/").to_lowercase(); // Remove possible quotation marks and standardize slashes.
 
         // Make sure we're not using a disallowed extension.
-        if fixed_path.len() > 3 && disallowed_filetypes.contains(&fixed_path[fixed_path.len()-3..fixed_path.len()].to_lowercase().as_str())
+        if fixed_path.len() > 3 && DISALLOWED_FILETYPES.contains(&fixed_path[fixed_path.len()-3..fixed_path.len()].to_lowercase().as_str())
         { 
             let mut error_text = String::new();
             error_text.push_str("Resource file ");
@@ -243,7 +245,7 @@ use std::sync::Mutex;
 
 /// Provides a reference to a vector storing strings that correspond to the relative paths of every file in
 /// the provided directory.  Subsequent calls return the cached value of the first call.
-pub fn generate_directory_tree( args: &Arguments, disallowed_filetypes: &[&str] ) -> Result<&'static Vec<String>, Error>
+pub fn generate_directory_tree( args: &Arguments ) -> Result<&'static Vec<String>, Error>
 {
     lazy_static!
     {
@@ -256,6 +258,39 @@ pub fn generate_directory_tree( args: &Arguments, disallowed_filetypes: &[&str] 
     // and the negative outcome of one would be a performance penalty and nothing else.
     unsafe
     {
-        return shared::compute_or_get_safe_reference_to_directory_cache( vec![&args.rootdir], "", disallowed_filetypes, &DIRLIST_INIT_STATE, &mut DIRLIST );
+        return shared::compute_or_get_safe_reference_to_directory_cache( vec![&args.rootdir], "", DISALLOWED_FILETYPES, &DIRLIST_INIT_STATE, &mut DIRLIST );
+    }
+}
+
+#[cfg(test)]
+mod tests 
+{
+    use shared::get_barebones_args;
+    use shared::get_root_test_directory;
+    use shared::do_validity_test;
+    use super::*;
+
+    #[test]
+    fn test_valid_reslists() 
+    {
+        let mut valid_reslist_dir = get_root_test_directory();
+        valid_reslist_dir.push("reslist_tests");
+        valid_reslist_dir.push("valid");
+
+        let args = get_barebones_args();
+
+        do_validity_test(&args, &valid_reslist_dir, "Reslist", check_reslist, true);
+    }
+
+    #[test]
+    fn test_invalid_reslists() 
+    {
+        let mut invalid_reslist_dir = get_root_test_directory();
+        invalid_reslist_dir.push("reslist_tests");
+        invalid_reslist_dir.push("invalid");
+
+        let args = get_barebones_args();
+
+        do_validity_test(&args, &invalid_reslist_dir, "Reslist", check_reslist, false);
     }
 }

@@ -2,6 +2,8 @@ use std::path::{Path, PathBuf};
 use std::io::{Error, ErrorKind};
 use std::error::Error as ErrorTrait; // Use an alias as it will conflict with the error object otherwise.
 
+use std::fs;
+
 use walkdir::WalkDir;
 
 use argument_handler::Arguments;
@@ -152,6 +154,59 @@ pub fn check_all_files_in_dir_with_func( args: &Arguments, dir: &PathBuf, extens
     Ok(())
 }
 
+/// Removes all files in the given directory tree with the given extension.
+pub fn remove_files_in_directory( files_dir: &PathBuf, target_extension: &str ) -> Result<(), Error>
+{
+    // Make sure our  directory exists and if so scan it for files.
+    if files_dir.is_dir()
+    {
+        for entry in WalkDir::new( files_dir ) 
+        {
+            let entry = entry?;
+            let entrypath = entry.path();
+
+            // Not a file we have access to, don't worry about it.
+            if !entrypath.is_file() { continue; }
+
+            // Grab the file extension for comparison.
+            let file_extension = get_file_extension(entrypath);
+
+            let file_extension = file_extension.split(".").last().unwrap_or("");
+
+            // If we only want a particular type of file, ignore all others.
+            if !target_extension.is_empty() && file_extension.to_lowercase() != target_extension { continue; }
+
+            // Looks like everything checks out...delete the file.
+            fs::remove_file(entrypath)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Counts all files in the given directory tree.
+pub fn count_files_in_directory( files_dir: &PathBuf ) -> Result<u32, Error>
+{
+    let mut file_count = 0;
+
+    // Make sure our  directory exists and if so scan it for files.
+    if files_dir.is_dir()
+    {
+        for entry in WalkDir::new( files_dir ) 
+        {
+            let entry = entry?;
+            let entrypath = entry.path();
+
+            // Not a file we have access to, don't worry about it.
+            if !entrypath.is_file() { continue; }
+
+            file_count += 1;
+        }
+    }
+
+    Ok(file_count)
+}
+
 use std::sync::Mutex;
 use std::ops::DerefMut;
 
@@ -192,4 +247,68 @@ pub fn compute_or_get_safe_reference_to_directory_cache( cache_dirs: Vec<&PathBu
     }
 
     return Ok(dirlist_ref);
+}
+
+#[cfg(test)]
+pub fn do_validity_test( args: &Arguments, dir: &PathBuf, print_type: &str, check_func: fn( args: &Arguments, music_script_path: &PathBuf ) -> Result<(), Error>, should_pass: bool )
+{
+    for entry in WalkDir::new( dir )
+    {
+        let entry = entry.unwrap();
+        let entrypath = entry.path();
+
+        if !entrypath.is_file() { continue; }
+
+        let check_result = check_func( &args, &entrypath.to_path_buf() );
+
+        if should_pass == false
+        {
+            assert!( check_result.is_err(), "{} {} was detected as valid when it should be invalid!", print_type, entrypath.display() );
+        }
+        else
+        {
+            assert!( !check_result.is_err(), "{} {} was detected as invalid when it should be valid!  Error was {}", print_type, entrypath.display(), check_result.err().unwrap() );
+        }
+    }
+}
+
+#[cfg(test)]
+pub fn get_barebones_args() -> Arguments
+{
+    let test_rootdir = get_root_test_directory();
+
+    let mut test_gesdir = test_rootdir.clone();
+    test_gesdir.push("gesdir");
+    test_gesdir.push("gesource");
+
+    let mut test_rootdir = test_rootdir.clone();
+    test_rootdir.push("rootdir");
+    test_rootdir.push("gesource");
+    
+
+    Arguments
+    {
+        rootdir: test_gesdir,
+        gesdir: test_rootdir,
+        baseweight: 700,
+        minplayers: 16,
+        maxplayers: 0,
+        resintensity: 7,
+        teamthresh: 12,
+        compress: false,
+        recompress: false,
+        verbose: false,
+        fullcheck: false,
+        noexitprompt: true,
+    }
+}
+
+#[cfg(test)]
+pub fn get_root_test_directory() -> PathBuf
+{
+    let mut test_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    test_dir.push("resources");
+    test_dir.push("tests");
+
+    test_dir
 }

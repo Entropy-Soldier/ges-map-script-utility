@@ -1,0 +1,4 @@
+"music"
+{
+	"file"	"music/base_song5.mp3"
+}

@@ -2,6 +2,7 @@
 extern crate walkdir;
 extern crate clap;
 extern crate regex;
+extern crate bzip2;
 #[macro_use] extern crate lazy_static;
 
 // Standard Library
@@ -14,6 +15,7 @@ mod argument_handler;
 mod map_script_builder;
 mod music_script_builder;
 mod reslist_builder;
+mod folder_compressor;
 mod shared;
 
 fn main()
@@ -66,7 +68,7 @@ fn create_or_verify_map_script_files( args: argument_handler::Arguments, map_nam
     let mut error_code = match music_script_builder::create_or_verify_music_script_file( &args, &map_name )
     {
         Ok(_) => 0x0000,
-        Err(e) => { println!("[Error] Failed reslist section with error:\n{}\n", e); 0x0008 },
+        Err(e) => { println!("[Error] Failed music list section with error:\n{}\n", e); 0x0004 },
     };
 
     // We need to join here on the chance we're creating a reslist.
@@ -79,6 +81,17 @@ fn create_or_verify_map_script_files( args: argument_handler::Arguments, map_nam
         Ok(_) => 0x0000,
         Err(e) => { println!("[Error] Failed reslist section with error:\n{}\n", e); 0x0008 },
     };
+
+    // We don't -always- want to build the compressed folder, as it's not ideal for map release.
+    // However, for server owners downloading the map it's quite useful so we provide the option.
+    if args.compress
+    {
+        error_code += match folder_compressor::construct_compressed_filesystem( &args, &map_name )
+        {
+            Ok(_) => 0x0000,
+            Err(e) => { println!("[Error] Failed compression with error:\n{}\n", e); 0x0016 },
+        };
+    }
 
     // We made it to the end!  Return our error code, which is the combined result of each module that may have failed.
     pause_then_exit( !args.noexitprompt, error_code );

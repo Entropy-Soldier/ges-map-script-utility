@@ -1,0 +1,4 @@
+"music"
+{
+	"file"	"music/custom_song5.wav"
+}

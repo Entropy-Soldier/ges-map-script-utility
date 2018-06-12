@@ -1,0 +1,11 @@
+"music"
+
+	"file"	"music/custom_song1.mp3"
+	"file"	"music/custom_song2.mp3"
+	"file"	"music/custom_song3.mp3"
+	"file"	"music/custom_song4.mp3"
+	"file"	"music/base_song1.mp3"
+	"file"	"music/base_song2.mp3"
+	"file"	"music/base_song3.mp3"
+	"file"	"music/base_song4.mp3"
+}
