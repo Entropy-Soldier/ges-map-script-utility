@@ -17,6 +17,8 @@ use std::thread;
 use reslist_builder;
 use shared;
 
+/// Compresses every file in the reslist with bz2 and moves them to an adjacent folder titled "gesource_compressed".
+/// Folder hierarchy is maintained.
 pub fn construct_compressed_filesystem( args: &Arguments, map_name: &str ) -> Result<(), Error>
 {
     // Our fastdownload server should have everything the reslist has, plus the map itself.
@@ -79,6 +81,7 @@ pub fn construct_compressed_filesystem( args: &Arguments, map_name: &str ) -> Re
     Ok(())
 }
 
+/// Compresses the file at root_path + relative_path, and places the result into c_root_path + relative_path.
 fn compress_file( args: &Arguments, root_path: &PathBuf, c_root_path: &PathBuf, relative_path: &PathBuf ) -> Result<(), Error>
 {
     // First get the path of the original file.
@@ -123,6 +126,7 @@ fn compress_file( args: &Arguments, root_path: &PathBuf, c_root_path: &PathBuf, 
     Ok(())
 }
 
+/// Takes an extension "X" and returns an extension "X.bz2"
 fn create_compressed_extension( uncompressed_pathbuf: &PathBuf ) -> OsString
 {
     // Source expects a sort of double-extension of xxx.bz2
@@ -142,6 +146,7 @@ fn create_compressed_extension( uncompressed_pathbuf: &PathBuf ) -> OsString
     compressed_extension
 }
 
+/// Returns the correct location of the gesource_compressed directory relative to the given root directory.
 fn get_compressed_directory( root_path: &PathBuf ) -> Result<PathBuf, Error>
 {
     // Now determine where we want the compressed version to go.

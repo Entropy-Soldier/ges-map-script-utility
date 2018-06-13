@@ -2,6 +2,9 @@ use std::path::{Path, PathBuf};
 use std::io::{Error, ErrorKind};
 use std::error::Error as ErrorTrait; // Use an alias as it will conflict with the error object otherwise.
 
+use std::sync::Mutex;
+use std::ops::DerefMut;
+
 use std::fs;
 
 use walkdir::WalkDir;
@@ -207,9 +210,6 @@ pub fn count_files_in_directory( files_dir: &PathBuf ) -> Result<u32, Error>
     Ok(file_count)
 }
 
-use std::sync::Mutex;
-use std::ops::DerefMut;
-
 /// Walks each directory in cache_dirs and runs get_files_in_directory on them with the target_filetype and disallowed_filetype
 /// parameters.  After completion, the results will be stored in the contents of directory_cache and mutex will be set to true and
 /// a reference to the contents of directory_cache will be returned.
@@ -250,7 +250,8 @@ pub fn compute_or_get_safe_reference_to_directory_cache( cache_dirs: Vec<&PathBu
 }
 
 #[cfg(test)]
-pub fn do_validity_test( args: &Arguments, dir: &PathBuf, print_type: &str, check_func: fn( args: &Arguments, music_script_path: &PathBuf ) -> Result<(), Error>, should_pass: bool )
+/// Tests every file in the given directory using the given parameters.
+pub fn do_validity_test( args: &Arguments, dir: &PathBuf, print_type: &str, check_func: fn( args: &Arguments, script_path: &PathBuf ) -> Result<(), Error>, should_pass: bool )
 {
     for entry in WalkDir::new( dir )
     {
@@ -273,6 +274,33 @@ pub fn do_validity_test( args: &Arguments, dir: &PathBuf, print_type: &str, chec
 }
 
 #[cfg(test)]
+/// Tests the result of a given script creator with the given check function, passing if the check is valid and failing if it is not.
+pub fn test_script_creator( args: &Arguments, 
+                        file_name: &str, 
+                        create_func: fn( args: &Arguments, script_path: &PathBuf ) -> Result<(), Error>,
+                        check_func: fn( args: &Arguments, script_path: &PathBuf ) -> Result<(), Error> ) 
+{
+    // Now that we've confirmed the script checker works...let's create a file and use it to check it!
+    let mut temp_dir = get_root_test_directory();
+    temp_dir.push("temp");
+
+    let mut script_path = temp_dir.clone();
+    script_path.push(file_name);
+
+    // Remove any previous script files that may have existed here before.
+    if script_path.is_file()
+    {
+        fs::remove_file(&script_path).unwrap();
+    }
+
+    create_func( &args, &script_path ).unwrap();
+    check_func( &args, &script_path ).unwrap();
+
+    // If we got here with no erors we passed the test!
+}
+
+#[cfg(test)]
+/// Creates a set of barebones arguments for testing.
 pub fn get_barebones_args() -> Arguments
 {
     let test_rootdir = get_root_test_directory();
@@ -288,11 +316,11 @@ pub fn get_barebones_args() -> Arguments
 
     Arguments
     {
-        rootdir: test_gesdir,
-        gesdir: test_rootdir,
+        rootdir: test_rootdir,
+        gesdir: test_gesdir,
         baseweight: 700,
-        minplayers: 16,
-        maxplayers: 0,
+        minplayers: 0,
+        maxplayers: 16,
         resintensity: 7,
         teamthresh: 12,
         compress: false,
@@ -304,6 +332,7 @@ pub fn get_barebones_args() -> Arguments
 }
 
 #[cfg(test)]
+/// Locates the project's root directory
 pub fn get_root_test_directory() -> PathBuf
 {
     let mut test_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));

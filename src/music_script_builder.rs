@@ -259,6 +259,7 @@ mod tests
     use shared::get_barebones_args;
     use shared::get_root_test_directory;
     use shared::do_validity_test;
+    use shared::test_script_creator;
     use super::*;
 
     #[test]
@@ -283,5 +284,12 @@ mod tests
         let args = get_barebones_args();
 
         do_validity_test(&args, &invalid_music_script_dir, "Music Script", check_music_script_file, false);
+    }
+
+    #[test]
+    fn test_music_script_creator() 
+    {
+        // Now that we've confirmed the script checker works...let's create a file and use it to check it!
+        test_script_creator( &get_barebones_args(), "level_music_test_map.txt", create_music_script_file, check_music_script_file );
     }
 }

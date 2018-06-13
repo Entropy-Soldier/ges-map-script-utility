@@ -268,6 +268,7 @@ mod tests
     use shared::get_barebones_args;
     use shared::get_root_test_directory;
     use shared::do_validity_test;
+    use shared::test_script_creator;
     use super::*;
 
     #[test]
@@ -292,5 +293,12 @@ mod tests
         let args = get_barebones_args();
 
         do_validity_test(&args, &invalid_reslist_dir, "Reslist", check_reslist, false);
+    }
+
+    #[test]
+    fn test_reslist_creator() 
+    {
+        // Now that we've confirmed the script checker works...let's create a file and use it to check it!
+        test_script_creator( &get_barebones_args(), "test_map.res", create_reslist, check_reslist );
     }
 }

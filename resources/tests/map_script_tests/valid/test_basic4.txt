@@ -1,0 +1,43 @@
+// The game will try not to pick this map when the playercount is outside the range specified here.
+// The BaseWeight of the map controls how likely the map is to be chosen in random selection.
+// The map will not be chosen if the server playercount is below MinPlayers or above MaxPlayers
+// The baseweight scales with how far the playercount is from the average of MinPlayers and MaxPlayers.
+// because of this, maps with large ranges are not very likely to be picked at the edges of them.
+// ResIntensity is a measure of how much data in unique assets a map has.
+// It will avoid switching between maps with a combined intensity score of 10 or greater to avoid client crashes.
+
+ResIntensity	5
+MaxPlayers	28
+BaseWeight	700
+MinPlayers	-4
+TeamThreshold	14
+
+// Gamemode weights used when the map is switched to while playercount is above the team threshold.  
+TeamGamemodeWeights
+{
+	Mode1			0
+	Mode2			0
+	Mode3			0
+	Mode4			0
+}
+
+// Weights for each gamemode if the map is switched to below the team threshold.
+// Overrides whatever weight is specified in default.txt, if there is one.
+// If a gamemode is not listed here or in default.txt it won't be used.
+GamemodeWeights
+{
+	Mode1			400
+	Mode2			200
+	Mode3			100
+	Mode4			0
+}
+
+// Overrides the default weaponset weights if any sets are specified here.  Can be used as a blacklist.
+// Will only override weaponsets that are already in rotation, to prevent overriding gamemode specific lists.
+WeaponsetWeights
+{
+	set1		1000
+	set2		700
+	set3		400
+	set4		100
+}

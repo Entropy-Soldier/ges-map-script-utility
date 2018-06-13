@@ -417,3 +417,89 @@ fn check_arguments( args: &Arguments, map_name: &str ) -> Result<(), Error>
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests 
+{
+    use shared::get_barebones_args;
+    use shared::get_root_test_directory;
+    use super::*;
+
+    #[test]
+    fn test_barebones_argument_set()
+    {
+        // Our barebones args are a valid set and as such should unwrap correctly.
+        check_arguments( &get_barebones_args(), "test_map" ).unwrap();
+    }
+
+    #[test]
+    fn test_fullcheck_argument_set()
+    {
+        // Our barebones args are a valid set even with fullcheck and as such should unwrap correctly.
+        let mut args = get_barebones_args();
+        args.fullcheck = true;
+
+        check_arguments( &args, "test_map" ).unwrap();
+    }
+
+    #[test]
+    fn test_invalid_fullcheck_argument_set()
+    {
+        // rootdir is not a valid gesdir so this check should fail.
+        let mut args = get_barebones_args();
+        args.fullcheck = true;
+        args.gesdir = args.rootdir.clone();
+
+        assert!(check_arguments( &args, "test_map" ).is_err());
+    }
+
+    #[test]
+    fn test_non_ges_rootdir_argument_set()
+    {
+        // The rootdir must be a directory named "gesource", and so should fail on the root testing directory.
+        let mut args = get_barebones_args();
+        args.rootdir = get_root_test_directory();
+
+        assert!(check_arguments( &args, "test_map" ).is_err());
+    }
+
+    #[test]
+    fn test_fullcheck_with_no_rootdir_argument_set()
+    {
+        // We don't use rootdir in fullcheck mode so the program should still run without a valid one.
+        let mut args = get_barebones_args();
+        args.fullcheck = true;
+        args.rootdir = get_root_test_directory();
+
+        check_arguments( &args, "test_map" ).unwrap();
+    }
+
+    #[test]
+    fn test_non_gesource_gesdir_argument_set()
+    {
+        // The gesdir must be a directory named "gesource", and so should fail on the root testing directory.
+        let mut args = get_barebones_args();
+        args.fullcheck = true;
+        args.gesdir = get_root_test_directory();
+
+        assert!(check_arguments( &args, "test_map" ).is_err());
+    }
+
+    #[test]
+    fn test_invalid_gesdir_argument_set()
+    {
+        // The gesdir must have certain files in it, which rootdir doesn't have.
+        let mut args = get_barebones_args();
+        args.fullcheck = true;
+        args.gesdir = args.rootdir.clone();
+
+        assert!(check_arguments( &args, "test_map" ).is_err());
+    }
+
+    #[test]
+    fn test_get_map_name()
+    {
+        /// See if we're correctly inferring the map name.
+        assert_eq!( get_map_name(&get_barebones_args()), "test_map" );
+    }
+}

@@ -165,6 +165,15 @@ fn check_map_script_file( _args: &Arguments, map_script_path: &PathBuf ) -> Resu
             {
                 checking_term = String::from(line_identifier);
             }
+            else
+            {
+                let mut error_text = String::new();
+                error_text.push_str("Line identifier ");
+                error_text.push_str( &line_identifier );
+                error_text.push_str(" is not a supported parameter!");
+
+                return Err(Error::new(ErrorKind::InvalidData, error_text ));
+            }
         }
         else
         {
@@ -187,7 +196,7 @@ fn check_map_script_file( _args: &Arguments, map_script_path: &PathBuf ) -> Resu
             if line_identifier == None
             {
                 let mut error_text = String::new();
-                error_text.push_str("[Map Script Validate Error] Subvalue section for ");
+                error_text.push_str("Subvalue section for ");
                 error_text.push_str( &checking_term );
                 error_text.push_str(" contains an blank line when it must not contain any!");
 
@@ -213,7 +222,7 @@ fn check_map_script_file( _args: &Arguments, map_script_path: &PathBuf ) -> Resu
     if !checking_term.is_empty()
     {
         let mut error_text = String::new();
-        error_text.push_str("[Map Script Validate Error] Script ends in the middle of the ");
+        error_text.push_str("Script ends in the middle of the ");
         error_text.push_str( &checking_term );
         error_text.push_str("Section!");
 
@@ -223,7 +232,7 @@ fn check_map_script_file( _args: &Arguments, map_script_path: &PathBuf ) -> Resu
     if !needed_value_terms.is_empty()
     {
         let mut error_text = String::new();
-        error_text.push_str("[Map Script Validate Error] Absent value terms: ");
+        error_text.push_str("Absent value terms: ");
         for term in needed_value_terms
         {
             error_text.push_str( term );
@@ -236,7 +245,7 @@ fn check_map_script_file( _args: &Arguments, map_script_path: &PathBuf ) -> Resu
     if !needed_bracket_terms.is_empty()
     {
         let mut error_text = String::new();
-        error_text.push_str("[Map Script Validate Error] Absent bracket terms: ");
+        error_text.push_str("Absent bracket terms: ");
         for term in needed_bracket_terms
         {
             error_text.push_str( term );
@@ -255,7 +264,7 @@ fn check_line_value_validity( line_identifier: &str, line_value: Option<&str> ) 
     if line_value == None
     {
         let mut error_text = String::new();
-        error_text.push_str("[Map Script Validate Error] Expected value for parameter ");
+        error_text.push_str("Expected value for parameter ");
         error_text.push_str( line_identifier );
 
         return Err(Error::new(ErrorKind::InvalidData, error_text ));
@@ -270,7 +279,7 @@ fn check_line_value_validity( line_identifier: &str, line_value: Option<&str> ) 
         Err(_) => 
         {
             let mut error_text = String::new();
-            error_text.push_str("[Map Script Validate Error] Parameter for ");
+            error_text.push_str("Parameter for ");
             error_text.push_str( line_identifier );
             error_text.push_str(" not a valid whole number value!");
 
@@ -287,6 +296,7 @@ mod tests
     use shared::get_barebones_args;
     use shared::get_root_test_directory;
     use shared::do_validity_test;
+    use shared::test_script_creator;
     use super::*;
 
     #[test]
@@ -311,5 +321,12 @@ mod tests
         let args = get_barebones_args();
 
         do_validity_test(&args, &invalid_map_script_dir, "Map Script", check_map_script_file, false);
+    }
+
+    #[test]
+    fn test_map_script_creator() 
+    {
+        // Now that we've confirmed the script checker works...let's create a file and use it to check it!
+        test_script_creator( &get_barebones_args(), "test_map.txt", create_map_script_file, check_map_script_file );
     }
 }
