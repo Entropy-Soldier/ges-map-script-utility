@@ -1,3 +1,11 @@
+// Copyright 2018 Entropy-Soldier
+//
+// Licensed under the MIT license: http://opensource.org/licenses/MIT
+// This file may not be copied, modified, or distributed except according to those terms.
+
+// --------------------------------------------------------------------------------------------------------------
+// map_script_builder: Contains functions for analyzing and building map script files for GoldenEye: Source maps.
+// --------------------------------------------------------------------------------------------------------------
 
 use std::fs;
 use std::io::prelude::*;

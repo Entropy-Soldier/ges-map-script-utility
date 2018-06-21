@@ -1,3 +1,12 @@
+// Copyright 2018 Entropy-Soldier
+//
+// Licensed under the MIT license: http://opensource.org/licenses/MIT
+// This file may not be copied, modified, or distributed except according to those terms.
+
+// ---------------------------------------------------------------------
+// argument_handler: Parses commandline input and ensures its validity.
+// ---------------------------------------------------------------------
+
 use clap::{Arg, App};
 
 use std::env;
@@ -61,10 +70,10 @@ pub fn parse_and_validate_arguments() -> Result<( Arguments, String ), Error>
 /// Collects the arguments into an easy to reference struct.
 fn parse_arguments() -> Arguments
 {
-    let matches = App::new("GE:S Map Release Assistant for 5.0")
-        .version("0.9")
+    let matches = App::new("GoldenEye: Source 5.0 Map Script Utility")
+        .version("1.0")
         .author("Entropy-Soldier <entropysoldierprojects@gmail.com>")
-        .about("Assists with the release of GoldenEye: Source 5.0 maps by automatically creating several key files.")
+        .about("Creates and verifies all necessary script files for GoldenEye: Source maps.")
         .arg(Arg::with_name("rootdir")
             .short("r")
             .long("rootdir")

@@ -1,3 +1,12 @@
+// Copyright 2018 Entropy-Soldier
+//
+// Licensed under the MIT license: http://opensource.org/licenses/MIT
+// This file may not be copied, modified, or distributed except according to those terms.
+
+// -----------------------------------------------------------------------
+// main: Entry point for the program, splits up and handles desired tasks.
+// -----------------------------------------------------------------------
+
 // External Crates
 extern crate walkdir;
 extern crate clap;

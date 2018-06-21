@@ -1,3 +1,11 @@
+// Copyright 2018 Entropy-Soldier
+//
+// Licensed under the MIT license: http://opensource.org/licenses/MIT
+// This file may not be copied, modified, or distributed except according to those terms.
+
+// ------------------------------------------------------------------------------------------------------------------
+// music_script_builder: Contains functions for analyzing and building music script files for GoldenEye: Source maps.
+// ------------------------------------------------------------------------------------------------------------------
 
 use std::fs;
 use std::io::prelude::*;

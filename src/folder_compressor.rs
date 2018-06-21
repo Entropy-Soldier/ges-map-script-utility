@@ -1,3 +1,11 @@
+// Copyright 2018 Entropy-Soldier
+//
+// Licensed under the MIT license: http://opensource.org/licenses/MIT
+// This file may not be copied, modified, or distributed except according to those terms.
+
+// -----------------------------------------------------------------------------------------------------
+// folder_compressor: Produces a directory containing compressed versions of all downloadable map files.
+// -----------------------------------------------------------------------------------------------------
 
 use std::fs;
 use argument_handler::Arguments;

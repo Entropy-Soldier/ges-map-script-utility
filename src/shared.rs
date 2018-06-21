@@ -1,3 +1,12 @@
+// Copyright 2018 Entropy-Soldier
+//
+// Licensed under the MIT license: http://opensource.org/licenses/MIT
+// This file may not be copied, modified, or distributed except according to those terms.
+
+// ----------------------------------------------------------------------------
+// shared: Contains utility functions and code shared between various modules.
+// ----------------------------------------------------------------------------
+
 use std::path::{Path, PathBuf};
 use std::io::{Error, ErrorKind};
 use std::error::Error as ErrorTrait; // Use an alias as it will conflict with the error object otherwise.
