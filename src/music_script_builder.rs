@@ -203,7 +203,7 @@ fn check_music_script_file( args: &Arguments, music_script_path: &PathBuf ) -> R
         let fixed_path = cap[4].replace("\"", "").replace("\\", "/").to_lowercase(); // Remove possible quotation marks and standardize slashes.
 
         // Make sure we're an mp3...or are at least claiming to be.
-        if fixed_path.len() > 3 && fixed_path[fixed_path.len()-3..fixed_path.len()].to_lowercase() != "mp3"
+        if shared::get_string_file_extension( fixed_path.as_str() ).to_lowercase() != "mp3"
         {
             let mut error_text = String::new();
             error_text.push_str("File ");

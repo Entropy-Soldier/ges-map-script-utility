@@ -75,7 +75,7 @@ fn create_reslist( args: &Arguments, reslist_path: &PathBuf ) -> Result<(), Erro
     // them to clients when the time comes.
     // We don't want to include the map bsp itself however as it will get downloaded regardless.
     // We also don't want to include any reslists or exe files.
-    let file_list = shared::get_files_in_directory( &args.rootdir, "", &["bsp", "res", "exe"] )?;
+    let file_list = generate_directory_tree( args )?;
 
     // This should never happen in normal operation since the other script files should be created or validated
     // before this part of the program is run, and they must exist in the root directory else it would have errored out.
@@ -164,7 +164,7 @@ fn check_reslist( args: &Arguments, reslist_path: &PathBuf ) -> Result<(), Error
         let fixed_path = cap[1].replace("\"", "").replace("\\", "/").to_lowercase(); // Remove possible quotation marks and standardize slashes.
 
         // Make sure we're not using a disallowed extension.
-        if fixed_path.len() > 3 && DISALLOWED_FILETYPES.contains(&fixed_path[fixed_path.len()-3..fixed_path.len()].to_lowercase().as_str())
+        if DISALLOWED_FILETYPES.contains( &shared::get_string_file_extension( &fixed_path.as_str() ).to_lowercase().as_str() )
         { 
             let mut error_text = String::new();
             error_text.push_str("Resource file ");

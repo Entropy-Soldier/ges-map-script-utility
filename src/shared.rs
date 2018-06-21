@@ -219,6 +219,24 @@ pub fn count_files_in_directory( files_dir: &PathBuf ) -> Result<u32, Error>
     Ok(file_count)
 }
 
+/// Splits up a string representation of a filepath and extracts the last extension from it.
+/// ex: file.xxx.yyy will return a string slice of yyy.  Returns a blank string slice if no extension found.
+pub fn get_string_file_extension( filepath: &str ) -> &str
+{
+    // First isolate the filename by taking the very last entry in the filepath.
+    let filename = filepath.split("\\").last().unwrap_or("");
+    let filename = filename.split("/").last().unwrap_or("");
+
+    let mut filename_split = filename.split(".");
+
+    // By advancing the iterator once, we make sure that we don't return the filename as the extension
+    // if there is no extension.
+    filename_split.next();
+    let file_extension = filename_split.last().unwrap_or("");
+
+    file_extension
+}
+
 /// Walks each directory in cache_dirs and runs get_files_in_directory on them with the target_filetype and disallowed_filetype
 /// parameters.  After completion, the results will be stored in the contents of directory_cache and mutex will be set to true and
 /// a reference to the contents of directory_cache will be returned.
@@ -349,4 +367,28 @@ pub fn get_root_test_directory() -> PathBuf
     test_dir.push("tests");
 
     test_dir
+}
+
+#[cfg(test)]
+mod tests 
+{
+    use super::*;
+
+    #[test]
+    fn test_get_string_file_extension() 
+    {
+        assert_eq!( get_string_file_extension("somefile.txt"), "txt" );
+        assert_eq!( get_string_file_extension("somefile"), "" );
+        assert_eq!( get_string_file_extension("somefile.txt.bz2"), "bz2" );
+        assert_eq!( get_string_file_extension("somefile."), "" );
+        assert_eq!( get_string_file_extension("EEEEEEEEEEE.txt.zip.tar.bz2"), "bz2" );
+        assert_eq!( get_string_file_extension("somefile.so"), "so" );
+        assert_eq!( get_string_file_extension("some/folder/somefile.bsp"), "bsp" );
+        assert_eq!( get_string_file_extension("some/folder/somefile.bsp.e"), "e" );
+        assert_eq!( get_string_file_extension("some/folder/.git/somefile.bsp"), "bsp" );
+        assert_eq!( get_string_file_extension("some\\folder\\somefile.bsp.z"), "z" );
+        assert_eq!( get_string_file_extension("some/folder/.git/somefile"), "" );
+        assert_eq!( get_string_file_extension("some/folder/.git\\somefile"), "" );
+        assert_eq!( get_string_file_extension("some/folder/.git\\somefile.good"), "good" );
+    }
 }
