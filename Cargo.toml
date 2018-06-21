@@ -1,0 +1,11 @@
+[package]
+name = "ges_scriptutility"
+version = "1.0.0"
+authors = ["Entropy-Soldier <entropysoldierprojects@gmail.com>"]
+
+[dependencies]
+walkdir = "2"
+clap = "~2.31"
+regex = "1.0.0"
+lazy_static = "1.0"
+bzip2 = "0.3.2"
