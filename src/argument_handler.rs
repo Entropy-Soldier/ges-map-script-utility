@@ -71,7 +71,7 @@ pub fn parse_and_validate_arguments() -> Result<( Arguments, String ), Error>
 fn parse_arguments() -> Arguments
 {
     let matches = App::new("GoldenEye: Source 5.0 Map Script Utility")
-        .version("1.0")
+        .version("1.0.1")
         .author("Entropy-Soldier <entropysoldierprojects@gmail.com>")
         .about("Creates and verifies all necessary script files for GoldenEye: Source maps.")
         .arg(Arg::with_name("rootdir")
@@ -312,6 +312,15 @@ fn check_arguments( args: &Arguments, map_name: &str ) -> Result<(), Error>
             },
         }
         
+        if is_directory_root_ges_install( &args.rootdir )
+        {
+            return Err(Error::new(ErrorKind::InvalidInput, "Supplied root directory is a full GE:S install!  \
+                                                            In normal mode, this program is meant to be run on map releases only. \
+                                                            Run with the -f flag for fullcheck mode if you want to inspect all scripts \
+                                                            in a given GE:S install.  Be sure to specify the fullcheck target directory \
+                                                            with the -g flag for best results." ));
+        }
+
         // Make sure maps directory exists.
         let mut mapsdir = args.rootdir.clone();
         mapsdir.push("maps");
@@ -389,15 +398,9 @@ fn check_arguments( args: &Arguments, map_name: &str ) -> Result<(), Error>
         // thinks it has valid GE:S data when it doesn't.  Because of this we'll want to error
         // out instead of just printing a warning.
 
-        // It's very unlikely that a random folder will have goldeneye.fgd, so we can safley assume
-        // that if this file exists where we expect we're in a valid GE:S directory.
-        let mut ges_file = args.gesdir.clone();
-        ges_file.push("goldeneye");
-        ges_file.set_extension("fgd");
-
-        if !ges_file.is_file()
+        if !is_directory_root_ges_install( &args.gesdir )
         {
-             return Err(Error::new(ErrorKind::InvalidInput, "GE:S directory is not the root directory of a valid GE:S installation!" ));
+            return Err(Error::new(ErrorKind::InvalidInput, "GE:S directory is not the root directory of a valid GE:S installation!" ));
         }
     }
 
@@ -427,12 +430,41 @@ fn check_arguments( args: &Arguments, map_name: &str ) -> Result<(), Error>
     Ok(())
 }
 
+/// Checks to see if the given directory is the root directory of a GoldenEye: Source install.
+fn is_directory_root_ges_install( directory: &PathBuf ) -> bool
+{
+    // A map release folder will pretty much never have goldeneye.fgd AND gameinfo.txt, so we can safley assume
+    // that if these files exist where we expect we're in a valid GE:S directory.
+    let mut fgd_file = directory.clone();
+    fgd_file.push("goldeneye.fgd");
+
+    let mut gameinfo_file = directory.clone();
+    gameinfo_file.push("gameinfo.txt");
+
+    if fgd_file.is_file() && gameinfo_file.is_file()
+    {
+        return true;
+    }
+
+    return false;
+}
+
 #[cfg(test)]
 mod tests 
 {
     use shared::get_barebones_args;
     use shared::get_root_test_directory;
     use super::*;
+
+    #[test]
+    fn test_is_directory_root_ges_install()
+    {
+        let args = get_barebones_args();
+        
+        // gesdir is a valid GE:S install while rootdir is only called "gesource"
+        assert!( is_directory_root_ges_install(&args.gesdir) );
+        assert!( !is_directory_root_ges_install(&args.rootdir) );
+    }
 
     #[test]
     fn test_barebones_argument_set()
@@ -503,6 +535,16 @@ mod tests
         args.gesdir = args.rootdir.clone();
 
         assert!(check_arguments( &args, "test_map" ).is_err());
+    }
+
+    #[test]
+    fn test_rootdir_as_gesdir_argument_set()
+    {
+        // The rootdir should not be set to a full GE:S install in non-fullcheck mode.
+        let mut args = get_barebones_args();
+        args.rootdir = args.gesdir.clone();
+
+        assert!(check_arguments( &args, "some_other_map" ).is_err());
     }
 
     #[test]
