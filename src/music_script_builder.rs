@@ -81,17 +81,17 @@ fn create_music_script_file( args: &Arguments, music_script_path: &PathBuf ) -> 
     let mut music_files_dir = args.rootdir.clone();
     music_files_dir.push("sound");
 
-    let mut music_file_names = shared::get_files_in_directory( &music_files_dir, "mp3", &[] )?;
+    let (_music_file_comp_names, mut music_file_write_names) = shared::get_files_in_directory( &music_files_dir, "mp3", &[] )?;
 
     // We don't have a sound directory, or it's empty, so let's provide some example music instead!
-    if music_file_names.is_empty() 
+    if music_file_write_names.is_empty() 
     {
-        music_file_names.push(String::from("music/classy.mp3"));
-        music_file_names.push(String::from("music/spy.mp3"));
-        music_file_names.push(String::from("music/always_better.mp3"));
-        music_file_names.push(String::from("music/shaken_and_stirred.mp3"));
-        music_file_names.push(String::from("music/martini.mp3"));
-        music_file_names.push(String::from("music/standard_operating_procedure.mp3"));
+        music_file_write_names.push(String::from("music/classy.mp3"));
+        music_file_write_names.push(String::from("music/spy.mp3"));
+        music_file_write_names.push(String::from("music/always_better.mp3"));
+        music_file_write_names.push(String::from("music/shaken_and_stirred.mp3"));
+        music_file_write_names.push(String::from("music/martini.mp3"));
+        music_file_write_names.push(String::from("music/standard_operating_procedure.mp3"));
     }
 
     // Now use our collected map names to write out our file contents.
@@ -99,7 +99,7 @@ fn create_music_script_file( args: &Arguments, music_script_path: &PathBuf ) -> 
     contents.push_str("\"music\"\r\n");
     contents.push_str("{\r\n");
 
-    for music_file in music_file_names
+    for music_file in music_file_write_names
     {
         contents.push_str("\t\"file\"\t\""); contents.push_str(&music_file); contents.push_str("\"\r\n");
     }
@@ -187,7 +187,7 @@ fn check_music_script_file( args: &Arguments, music_script_path: &PathBuf ) -> R
     // the sound directory it will probably be used, so we might as well scan them all at once.  This breaks down
     // a bit with the inclusion of scanning the local GE:S sound directory as well, but it does shave off a large
     // amount of syscalls on fullcheck mode and lets us share a lot of code between us and the reslist checker.
-    let mp3_files = generate_mp3_directory_tree( &gesource_sound_dir, &local_music_files_dir, "mp3" )?;
+    let &( ref mp3_files, ref _mp3_files_write) = generate_mp3_directory_tree( &gesource_sound_dir, &local_music_files_dir, "mp3" )?;
 
     // If we made it here it means we have a valid file with at least one file entry.  Check those file entries
     // to make sure they're formatted correctly and point to a valid music file.
@@ -235,14 +235,14 @@ use std::sync::Mutex;
 
 /// Provides a reference to a vector storing strings that correspond to the relative paths of every file in
 /// the provided directory.  Subsequent calls return the cached value of the first call.
-pub fn generate_mp3_directory_tree( gesource_sound_dir: &PathBuf, local_sound_dir: &PathBuf, target_type: &str ) -> Result<&'static Vec<String>, Error>
+pub fn generate_mp3_directory_tree( gesource_sound_dir: &PathBuf, local_sound_dir: &PathBuf, target_type: &str ) -> Result<&'static (Vec<String>, Vec<String>), Error>
 {
     lazy_static!
     {
         static ref DIRLIST_INIT_STATE: Mutex<bool> = Mutex::new(false);
     }
 
-    static mut DIRLIST: Option<Vec<String>> = None;
+    static mut DIRLIST: Option<(Vec<String>, Vec<String>)> = None;
 
     // Unsafe because the alternative is more convoluted to use, the possibility of a data race is almost 0,
     // and the negative outcome of one would be a performance penalty and nothing else.

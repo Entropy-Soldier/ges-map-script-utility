@@ -21,7 +21,7 @@ use walkdir::WalkDir;
 use argument_handler::Arguments;
 
 /// Gets the file paths of all files in a given directory, relative to the root path supplied.
-pub fn get_files_in_directory( files_dir: &PathBuf, target_extension: &str, excluded_extensions: &[&str] ) -> Result<Vec<String>, Error>
+pub fn get_files_in_directory( files_dir: &PathBuf, target_extension: &str, excluded_extensions: &[&str] ) -> Result<(Vec<String>, Vec<String>), Error>
 {
     // This is where the relative paths of our desired files will go.
     // For larger sets a hashmap would be better for the constant lookup time, but the linear lookup time
@@ -29,7 +29,10 @@ pub fn get_files_in_directory( files_dir: &PathBuf, target_extension: &str, excl
     // With smaller data sets, vec is usually going to be much faster, and no arbitrary insertion is ever needed.
     // Fullcheck mode will involve an upwards of 20,000 files, but this is a more esoteric use of the program
     // and even then the search time on the vectors is nearly imperceptable when scanning through ~50 music scripts.
-    let mut file_names: Vec<String> = Vec::new(); 
+    // We use two directories, one for easy compairison and one for easy insertion into scripts.
+    // The comp list is lowercase to facilitate case-insensitive searches, while the write list keeps the original case.
+    let mut comp_file_names: Vec<String> = Vec::new(); 
+    let mut write_file_names: Vec<String> = Vec::new(); 
 
     // Grab the directory path here for later.
     let dir_path = files_dir.to_str();
@@ -83,16 +86,18 @@ pub fn get_files_in_directory( files_dir: &PathBuf, target_extension: &str, excl
             };
 
             // Source engine uses forward slashes in the file paths its script files, so make sure all
-            // slashes are forward slashes.  Also go to lowercase for easy compairisons since windows is
-            // not case sensitive.
+            // slashes are forward slashes.  
             // This also gives us our final String object to push into the array.
-            let final_path_string = path_string.replace("\\", "/").to_lowercase();
+            // Drop to lowercase for our comp path and retain the original case for our write path.
+            let final_comp_path_string = path_string.replace("\\", "/").to_lowercase();
+            let final_write_path_string = path_string.replace("\\", "/");
 
-            file_names.push( final_path_string );
+            comp_file_names.push( final_comp_path_string );
+            write_file_names.push( final_write_path_string );
         }
     }
 
-    Ok(file_names)
+    Ok((comp_file_names, write_file_names))
 }
 
 /// Get the extension of the given path as a &str.  
@@ -243,7 +248,7 @@ pub fn get_string_file_extension( filepath: &str ) -> &str
 /// On subsequent calls with references to the same two variables, the computation is skipped and the contents of
 /// directory cache are returned directly.  This saves us from having to walk a directory set multiple times when
 /// the contents will not change between invocations.
-pub fn compute_or_get_safe_reference_to_directory_cache( cache_dirs: Vec<&PathBuf>, target_filetype: &str, disallowed_filetypes: &[&str], mutex: &'static Mutex<bool>, directory_cache: &'static mut Option<Vec<String>> ) -> Result<&'static Vec<String>, Error>
+pub fn compute_or_get_safe_reference_to_directory_cache( cache_dirs: Vec<&PathBuf>, target_filetype: &str, disallowed_filetypes: &[&str], mutex: &'static Mutex<bool>, directory_cache: &'static mut Option<(Vec<String>, Vec<String>)> ) -> Result<&'static (Vec<String>, Vec<String>), Error>
 {
     // First grab the mutex guard for the init variable.  If we're uninitalized, then we'll grab this and
     // do the computations, and set the value to true.  If we're in the proccess of initalizing, we'll wait
@@ -255,7 +260,7 @@ pub fn compute_or_get_safe_reference_to_directory_cache( cache_dirs: Vec<&PathBu
 
     if !*has_init
     {
-        *directory_cache = Some(Vec::new());
+        *directory_cache = Some((Vec::new(), Vec::new()));
     }
 
     let dirlist_ref = match *directory_cache
@@ -268,7 +273,10 @@ pub fn compute_or_get_safe_reference_to_directory_cache( cache_dirs: Vec<&PathBu
     {
         for dir in cache_dirs
         {
-            dirlist_ref.append(&mut get_files_in_directory( &dir, target_filetype, disallowed_filetypes )?);
+            let (mut comp_file_paths, mut write_file_paths) = get_files_in_directory( &dir, target_filetype, disallowed_filetypes )?;
+            
+            dirlist_ref.0.append(&mut comp_file_paths);
+            dirlist_ref.1.append(&mut write_file_paths);
         }
         *has_init = true;
     }

@@ -75,13 +75,13 @@ fn create_reslist( args: &Arguments, reslist_path: &PathBuf ) -> Result<(), Erro
     // them to clients when the time comes.
     // We don't want to include the map bsp itself however as it will get downloaded regardless.
     // We also don't want to include any reslists or exe files.
-    let file_list = generate_directory_tree( args )?;
+    let &(ref _file_comp_list, ref file_write_list) = generate_directory_tree( args )?;
 
     // This should never happen in normal operation since the other script files should be created or validated
     // before this part of the program is run, and they must exist in the root directory else it would have errored out.
     // There is the possibility that in the future there will be demand for a reslist-only parameter however so it
     // doesn't hurt to program defensively in this case.  If there are no files to download there's no point in making the reslist!
-    if file_list.is_empty()
+    if file_write_list.is_empty()
     {
         println!("[Warning] Root directory seems to be empty!  There are no files to include in the reslist so it will be skipped.");
         return Ok(());
@@ -94,7 +94,7 @@ fn create_reslist( args: &Arguments, reslist_path: &PathBuf ) -> Result<(), Erro
     contents.push_str("\"resources\"\r\n");
     contents.push_str("{\r\n");
 
-    for file in file_list
+    for file in file_write_list
     {
         contents.push_str("\t\""); contents.push_str(&file); contents.push_str("\"\t\"file\"\r\n");
     }
@@ -149,7 +149,9 @@ fn check_reslist( args: &Arguments, reslist_path: &PathBuf ) -> Result<(), Error
     // Otherwise the mapper could be sending out a file they don't need to, or forgot to put in the reslist.
     // Incurs a sizable performance hit on fullcheck mode, but with caching and a large number of reslists to
     // scan through it performs alright.
-    let file_list = generate_directory_tree( args )?;
+    // We actually want to do a case sensitive compairison here because some fast download servers are linux
+    // based and won't download the right files to the client if the case doesn't match.
+    let &( ref file_comp_list, ref file_write_list) = generate_directory_tree( args )?;
 
     let mut checked_file_list: Vec<String> = Vec::new(); 
 
@@ -161,7 +163,7 @@ fn check_reslist( args: &Arguments, reslist_path: &PathBuf ) -> Result<(), Error
     for cap in RE.captures_iter(&contents)
     {
         // We've already verified we've got a capture, and slot 1 is mandatory for us to have one.
-        let fixed_path = cap[1].replace("\"", "").replace("\\", "/").to_lowercase(); // Remove possible quotation marks and standardize slashes.
+        let fixed_path = cap[1].replace("\"", "").replace("\\", "/"); // Remove possible quotation marks and standardize slashes.
 
         // Make sure we're not using a disallowed extension.
         if DISALLOWED_FILETYPES.contains( &shared::get_string_file_extension( &fixed_path.as_str() ).to_lowercase().as_str() )
@@ -177,12 +179,24 @@ fn check_reslist( args: &Arguments, reslist_path: &PathBuf ) -> Result<(), Error
 
         // Check to see if our MP3 file is one of the files we've detected in the relevant directories.
         // if not, our script is pointing to an invalid file and isn't ready for release!
-        if !file_list.contains(&fixed_path)
+        if !file_write_list.contains(&fixed_path)
         {
             let mut error_text = String::new();
-            error_text.push_str("Failed to locate resource file ");
-            error_text.push_str(&fixed_path);
-            error_text.push_str("\nEnsure that the file path is valid, and that the file exists.");
+            
+            if !file_comp_list.contains(&fixed_path.to_lowercase())
+            {
+                error_text.push_str("Failed to locate resource file ");
+                error_text.push_str(&fixed_path);
+                error_text.push_str("\nEnsure that the file path is valid, and that the file exists.");
+            }
+            else
+            {
+                error_text.push_str("The case of resource file ");
+                error_text.push_str(&fixed_path);
+                error_text.push_str("\ndoes not match the reslist entry!\n");
+                error_text.push_str("Due to many fast download servers being run on linux,\n");       
+                error_text.push_str("reslists are case-sensitive.");          
+            }
 
             return Err(Error::new(ErrorKind::InvalidData, error_text ));
         }
@@ -218,12 +232,12 @@ fn check_reslist( args: &Arguments, reslist_path: &PathBuf ) -> Result<(), Error
 
     // file_list will live just as long as missing_file_list, so to save runtime let's just
     // take references to the entries in file list instead of copying the values.
-    for file in file_list
+    for file in file_write_list
     {
         // If we never checked it, it wasn't in the reslist.
         if !checked_file_list.contains(&file)
         {
-            missing_file_list.push(file);
+            missing_file_list.push(&file);
         }
     }
 
@@ -253,14 +267,14 @@ use std::sync::Mutex;
 
 /// Provides a reference to a vector storing strings that correspond to the relative paths of every file in
 /// the provided directory.  Subsequent calls return the cached value of the first call.
-pub fn generate_directory_tree( args: &Arguments ) -> Result<&'static Vec<String>, Error>
+pub fn generate_directory_tree( args: &Arguments ) -> Result<&'static (Vec<String>, Vec<String>), Error>
 {
     lazy_static!
     {
         static ref DIRLIST_INIT_STATE: Mutex<bool> = Mutex::new(false);
     }
 
-    static mut DIRLIST: Option<Vec<String>> = None;
+    static mut DIRLIST: Option<(Vec<String>, Vec<String>)> = None;
 
     // Unsafe because the alternative is more convoluted to use, the possibility of a data race is almost 0,
     // and the negative outcome of one would be a performance penalty and nothing else.

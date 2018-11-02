@@ -69,9 +69,9 @@ pub fn construct_compressed_filesystem( args: &Arguments, map_name: &str ) -> Re
     });
 
     // Make use of our cached result from the previous directory mapping.
-    let relevant_file_list = reslist_builder::generate_directory_tree( args )?;
+    let &(ref _relevant_file_comp_list, ref relevant_file_write_list) = reslist_builder::generate_directory_tree( args )?;
 
-    for file_path in relevant_file_list
+    for file_path in relevant_file_write_list
     {
         let os_path = OsString::from(file_path);
         let relative_path = PathBuf::from(&os_path);
@@ -115,6 +115,9 @@ fn compress_file( args: &Arguments, root_path: &PathBuf, c_root_path: &PathBuf, 
     {
         let compressed_parent_folder = compressed_pathbuf.parent().unwrap();
         fs::create_dir_all(&compressed_parent_folder)?;
+
+        // If this folder already exists, make sure the case matches.
+        fs::rename(&compressed_parent_folder, &compressed_parent_folder)?;
     }
 
     // For the output file we want to be sure we're always overwriting any pre-existing files.

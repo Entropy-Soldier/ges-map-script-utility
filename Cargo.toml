@@ -1,6 +1,6 @@
 [package]
 name = "ges_scriptutility"
-version = "1.0.1"
+version = "1.0.2"
 authors = ["Entropy-Soldier <entropysoldierprojects@gmail.com>"]
 
 [dependencies]

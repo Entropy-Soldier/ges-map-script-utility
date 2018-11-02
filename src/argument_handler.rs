@@ -71,7 +71,7 @@ pub fn parse_and_validate_arguments() -> Result<( Arguments, String ), Error>
 fn parse_arguments() -> Arguments
 {
     let matches = App::new("GoldenEye: Source 5.0 Map Script Utility")
-        .version("1.0.1")
+        .version("1.0.2")
         .author("Entropy-Soldier <entropysoldierprojects@gmail.com>")
         .about("Creates and verifies all necessary script files for GoldenEye: Source maps.")
         .arg(Arg::with_name("rootdir")
